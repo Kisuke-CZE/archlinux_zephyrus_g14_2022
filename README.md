@@ -1,2 +1,382 @@
-# archlinux_zephyrus_g14_2022
-Notes how to install ArchLinux on Asus Zephyrus G14 2022 (GA402RJ and GA402RK models)
+# Archlinux setup for Asus Zephyrus G14 2022 (GA402RJ/RK)
+
+## Basic installation
+
+Connect to wifi using `iwctl`:
+```
+station wlan0 scan
+station wlan0 get-networks
+station wlan0 connect <YOUR_SSID>
+```
+
+Now we will enable NTP synchronization and check time.  
+```
+timedatectl set-ntp true
+timedatectl set-timezone Europe/Prague
+timedatectl status
+```
+
+Now partition the disk. I choosed this schema for a 1TB drive:  
+| Partition      |  Size  |                           Additional info                                   |
+|----------------|--------|-----------------------------------------------------------------------------|
+| /dev/nvme0n1p1 |  2GB   | LABEL=BOOT, fs=fat32, ESP, future mountpoint = /boot                        |
+| /dev/nvme0n1p2 |  929GB | LABEL=ROOTFS, fs=btrfs, all data will be here on btrfs subvolumes           |
+
+**Beware when creating partition for /boot. It mmust be set to type=ESP (EF00).**
+
+I use cgdisk to create partitions: `cgdisk /dev/nvme0n1`
+
+I want to have whole `ROOTFS` encrypted, so I will set up encrypted FS:
+```
+cryptsetup luksFormat --label CRYPTROOT /dev/nvme0n1p2
+cryptsetup open /dev/nvme0n1p2 rootfs
+```
+
+**BEWARE**: It's important for my setup to create label on LUKS volume! This label must be totally different from label on partition and also different from filesystem label (we will create fs in next step). If you do not create label (or label will be same as partition for example), then you cannot use that label as cryptdevice parameter later! (Since I do not like to use UUID in manual setups, I preffer label for better readibility)
+
+Partitioning done, so let's make filesystems:  
+```
+mkfs.vfat -F 32 -n BOOT /dev/nvme0n1p1
+mkfs.btrfs -f -L ROOT /dev/mapper/rootfs
+```
+
+Now let's mount created rootfs where all data will be and create those subvolumes for that data. Since I want to support hibernation to swapfile, it needs to be larger than my RAM size (to be able to successfully hibernate).  
+```
+mount -t btrfs LABEL=ROOT /mnt
+btrfs subvolume create /mnt/@root
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+btrfs filesystem mkswapfile --size 43g /mnt/@swap/swapfile
+```
+
+Now unmount filesystem and mount with subvolumes we just created.  
+```
+umount /mnt/
+mount -o noatime,subvol=@root LABEL=ROOT /mnt
+mkdir -p /mnt/boot
+mkdir -p /mnt/home
+mkdir -p /mnt/swap
+mkdir -p /mnt/.snapshots
+mkdir -p /mnt/btrfs
+
+mount -o noatime,subvol=@home LABEL=ROOT /mnt/home
+mount -o noatime,subvol=@swap LABEL=ROOT /mnt/swap
+mount -o noatime,subvol=@snapshots LABEL=ROOT /mnt/.snapshots
+mount -o noatime LABEL=ROOT /mnt/btrfs
+mount /dev/nvme0n1p1 /mnt/boot
+swapon /mnt/swap/swapfile
+```
+
+Check if it's mounted successfully for sure with `df -Th` and `free -h`
+
+If everithing is OK, let's install the base system with `pacstrap /mnt base base-devel linux linux-firmware btrfs-progs vim networkmanager amd-ucode man-db man-pages texinfo bash-completion`
+
+Create fstab using `genfstab -Lp /mnt >> /mnt/etc/fstab`.
+
+## Setting the target system
+
+Now we finished basic installation. But installed system needs some setup and boot configuration. Let's get to it.
+
+Chroot into installed system using `arch-chroot /mnt`
+
+And do some basic settings:  
+```
+echo "<HOSTNAME>" > /etc/hostname
+ln -sf /usr/share/zoneinfo/Europe/Prague /etc/localtime
+hwclock --systohc
+echo "LANG=cs_CZ.UTF-8" > /etc/locale.conf
+echo "LANGUAGE=cs_CZ" >> /etc/locale.conf
+echo "KEYMAP=us" > /etc/vconsole.conf
+echo "FONT=lat2-16" >> /etc/vconsole.conf
+```
+
+Edit `/etc/hosts` with `vim /etc/hosts` to look like:  
+```
+127.0.0.1		localhost
+::1				localhost
+127.0.1.1		<HOSTNAME>.localdomain	<HOSTNAME>
+```
+
+Edit locales: `vim /etc/locale.gen`  
+For me I only uncommented `cs_CZ.UTF-8 UTF-8` and `en_US.UTF-8 UTF-8`  
+After that run `locale-gen`
+
+Set root password with `passwd`.
+
+Add `encrypt btrfs` to hooks in `/etc/mkinitcpio.conf`.  
+Example: `HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block filesystems fsck encrypt btrfs)`  
+Also add `amdgpu` to modules section in `/etc/mkinitcpio.conf`.  
+Example: `MODULES=(amdgpu)`  
+`vim /etc/mkinitcpio.conf`  
+When you are done editing, run `mkinitcpio -p linux`.
+
+Now let's install a bootloader. systemd-boot is kinda simple and easy to setup, so use `bootctl install`.  
+Prepare configuration with `vim /boot/loader/loader.conf`:  
+```
+default	archlinux
+timeout	0
+editor	0
+```
+And now prepare configuration for that `archlinux` item with `vim /boot/loader/entries/archlinux.conf`:  
+```
+title          Arch Linux
+linux          /vmlinuz-linux
+initrd	       /amd-ucode.img
+initrd         /initramfs-linux.img
+options        cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root rw
+```
+For some emergency situations let's prepare `archlinux-textmode` option. Menu can be displayed holding space key on boot. `vim /boot/loader/entries/archlinux-textmode.conf`
+```
+title          Arch Linux (textmode)
+linux          /vmlinuz-linux
+initrd	       /amd-ucode.img
+initrd         /initramfs-linux.img
+options        cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root rw 3
+```
+If label won't work for some reason you can use UUID, but **do not use together!**:  
+```
+echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs root=LABEL=ROOT rootflags=subvol=@root rw" >> /boot/loader/entries/archlinux.conf
+echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs root=LABEL=ROOT rootflags=subvol=@root rw 3" >> /boot/loader/entries/archlinux-textmode.conf
+```
+
+Consider to set up automatic update of systemd-boot according to this article: https://wiki.archlinux.org/title/Systemd-boot.
+
+Now we should be ready to boot to newly installed system. We will exit the chroot environment, unmount all volumes and reboot.  
+```
+exit
+swapoff /mnt/swap/swapfile
+umount -R /mnt/
+reboot
+```
+
+## Setup the installed system
+
+After reboot you will boot directly into system you just installed. Login as `root` and proceed with the initial setup.
+
+Enable NetworkManager and set wifi connection:  
+```
+systemctl enable --now NetworkManager
+nmcli device wifi connect "{YOURSSID}" password "{SSIDPASSWORD}"
+```
+
+Enable tyme synchronization using `systemctl enable --now systemd-timesyncd`.
+
+Edit `/etc/environment` and set `EDITOR=vim` with `vim /etc/environment`.
+
+Add user for normal usage (we don'w want to run a desktop as root) and set his password:  
+```
+useradd -m -g users -G wheel,lp,power,audio -s /bin/bash {MYUSERNAME}
+passwd {MYUSERNAME}
+```
+Execute `visudo` and uncomment `%wheel ALL=(ALL) ALL`
+
+Now logout using `exit` and login with user you just created.
+
+We can now disable root login by `sudo passwd -l root` and replacing root's encrypted password in `/etc/shadow` with `!`
+
+Install some essential packages:  
+```
+sudo pacman -Sy acpid dbus
+sudo systemctl enable acpid
+```
+
+Now we will enable multilib repository. So edit config with `sudo vim /etc/pacman.conf` and uncomment the `[multilib]` section.
+
+As next step install the graphics drivers (I also want 32bit support for wine and older apps) using `sudo pacman -Sy mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon libva-mesa-driver lib32-libva-mesa-driver mesa-vdpau lib32-mesa-vdpau`
+
+Maybe we can use of `xf86-video-amdgpu`, depends on your choice of environment.
+
+Now this depends on your choose. I want to use modern Gnome desktop and stick with Fedora/RHEL way, so I will install Pipewire: `sudo pacman -S pipewire lib32-pipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack`.
+
+I also want Gnome on Wayland, so install Wayland: `sudo pacman -S wayland xorg-xwayland`.
+
+Next let's install some [desktop environment](https://wiki.archlinux.org/title/Desktop_environment). I choosed [Gnome desktop](https://wiki.archlinux.org/index.php/GNOME) so `sudo pacman -S gnome gnome-initial-setup`.
+
+As a final step before reboot into graphics environment enable graphical login - for Gnome desktop it is `sudo systemctl enable gdm`.
+
+And reboot coomputer to run desktop environment. We will continue there, it will be lot easier.
+
+## Final setup in the graphics environment.
+
+### AUR helper
+
+Blame me, but since I use a lot of packages from ArchLinux's famous [AUR](https://wiki.archlinux.org/index.php/Arch_User_Repository) I like to use [helper](https://wiki.archlinux.org/title/AUR_helpers) for package installing. I choosed [yay](https://aur.archlinux.org/packages/yay).
+
+So open Gnome Console and install the helper:  
+```
+sudo pacman -S git
+mkdir work
+cd work
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si
+```
+
+### Install Gnome Dash to Dock
+
+I like to have dock so I will use previously installed AUR helper to install Dash to Dock extension: `yay -S gnome-shell-extension-dash-to-dock`
+
+### Remove unused applications
+
+There are some applications from default gnome collection I just do not use. Let's remove them: `sudo pacman -Rsncu gnome-maps gnome-weather gnome-photos gnome-clocks gnome-music totem cheese`
+
+### Make booting process pretty with Plymouth
+
+Well almost all important things are in place. Time for some cosmetics. Install plymouth `yay -S plymouth`
+
+Edit `/etc/mkinitcpio.conf` for example using `sudo gnome-text-editor /etc/mkinitcpio.conf`.
+
+Delete `encrypt` hook and add `plymouth plymouth-encrypt` after `base udev` hooks.
+
+Next install smooth transition for gdm: `yay -S gdm-plymouth`  
+It will replace `gdm`
+
+I want to use `bgrt` theme. So `sudo gnome-text-editor /etc/plymouth/plymouthd.conf` and set `Theme=bgrt`.  
+You might like different theme, see wiki for details: https://wiki.archlinux.org/title/plymouth  
+Also displaying Arch logo in an option: `sudo cp /usr/share/plymouth/arch-logo.png /usr/share/plymouth/themes/spinner/watermark.png`
+
+And add `quiet splash vt.global_cursor_default=0` `uiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0` as kernel parameters: `sudo gnome-text-editor /boot/loader/entries/archlinux.conf`
+
+Rebuild initramfs: `sudo mkinitcpio -p linux`
+
+Now reboot the system to test it.
+
+### Install Asus-Linux packages
+
+Since we have gaming machine with dual graphics, we will install tools for this machine from https://asus-linux.org/wiki/arch-guide/ .
+
+```
+sudo su -
+pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+```
+
+Edit pacman config with `vim /etc/pacman.conf` and add these lines at end:
+```
+[g14]
+Server = https://arch.asus-linux.org
+```
+
+Continue with:  
+```
+pacman -Suy
+pacman -S asusctl
+systemctl enable --now power-profiles-daemon.service
+pacman -S supergfxctl
+systemctl enable --now supergfxd
+pacman -S rog-control-center
+pacman -S npm
+exit
+
+git clone https://gitlab.com/asus-linux/supergfxctl-gex.git /tmp/supergfxctl-gex && cd /tmp/supergfxctl-gex
+npm install
+npm run build && npm run install-user
+cd ..
+rm -rf supergfxctl-gex
+
+git clone https://gitlab.com/asus-linux/asusctl-gex.git /tmp/asusctl-gex && cd /tmp/asusctl-gex
+npm install
+npm run build && npm run install-user
+cd ..
+rm -rf asusctl-gex
+```
+
+Logout from Gnome session and login again and after that go to `gnome-extensions` and enable installed extensions.
+
+### Enable wayland support in Firefox
+
+If you use Firefox as main browser as I do, it's good idea to enable native wayland support in it. (If you do not it will be running through XWayland compatability layer which from mine experience works OK, but why not run on wayland directly when app can).
+
+So edit environment with `sudo gnome-text-editor /etc/environment`.  
+And add `MOZ_ENABLE_WAYLAND=1`.  
+You'll need to relogin to make change effective.
+
+### Install firewall
+
+For some basic safety I want to have some basic firewall on my computer. I like simple solutions, so I use just `nftables` and edit firewall rules by hand.
+
+So install and enable nftables:  
+```
+sudo pacman -S nftables
+sudo systemctl enable --now nftables
+```
+
+And put your rules into config with `sudo gnome-text-editor /etc/nftables.conf`.
+
+Here is mine simple setup, which you can use as starting point:  
+```
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+define ssh_admins = {10.11.18.39, 10.1.0.0/24}
+
+table inet filter {
+	chain input {
+		type filter hook input priority 0; policy drop;
+
+		# established/related connections
+		ct state established,related accept
+
+		# invalid connections
+		ct state invalid drop
+
+		# loopback interface
+		iif lo accept
+
+		# ICMP & IGMP
+		ip6 nexthdr icmpv6 icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report } accept
+		ip protocol icmp icmp type { destination-unreachable, router-solicitation, router-advertisement, time-exceeded, parameter-problem } accept
+		ip protocol igmp accept
+
+		# SSH (port 22)
+		tcp dport ssh ip saddr $ssh_admins accept
+
+		# Allow Mikrotik discovery
+		udp dport 5678 accept
+
+		# Allow Mikrotik Streaming Sniffer
+		udp dport 37008 accept
+
+		# Allow Xerox printer discovery
+		udp dport 22161 accept
+		tcp dport 22161 accept
+
+		# Allow mDSN
+		udp dport mdns accept
+
+		# HTTP (ports 80 & 443)
+		# tcp dport { http, https } accept
+	}
+
+	chain forward {
+		type filter hook forward priority 0; policy drop;
+	}
+
+	chain output {
+		type filter hook output priority 0; policy accept;
+	}
+
+}
+```
+
+When you done editing, save the config and restart nftables `sudo systemctl restart nftables`.
+
+## That's all
+
+Since kernel 6.1 you do not need to install G14 specific kernel. You are ready to go
+
+## Credits
+
+This is just kinda notes for me how to install Archlinux on Zephyrus G14. Maybe it could be useful to someone else.
+
+It's based on [Unim8trix's guide](https://github.com/Unim8trix/G14Arch). (Let's look here, there are some great ideas like automatic snapshots, which I do not use since I want to make them manually)
+
+Of course on great work of guys at https://asus-linux.org/
+
+I also had to mention great [Archlinux Wiki](https://wiki.archlinux.org/), which is source of most knowledges used in this guide. Please consider reading [Installation guide](https://wiki.archlinux.org/title/Installation_guide) and [General recommendations](https://wiki.archlinux.org/title/General_recommendations), you can get a lot of knowledge here and then make some own adjustments.
+
+And also some mine old notes when I was using Archlinux on some Macbook was used when building this.
