@@ -161,7 +161,7 @@ systemctl enable --now NetworkManager
 nmcli device wifi connect "{YOURSSID}" password "{SSIDPASSWORD}"
 ```
 
-Enable tyme synchronization using `systemctl enable --now systemd-timesyncd`.
+Enable time synchronization using `systemctl enable --now systemd-timesyncd`.
 
 Edit `/etc/environment` and set `EDITOR=vim` with `vim /etc/environment`.
 
