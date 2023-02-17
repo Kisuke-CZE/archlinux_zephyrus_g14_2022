@@ -108,7 +108,8 @@ Add `encrypt btrfs` to hooks in `/etc/mkinitcpio.conf`.
 Example: `HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block filesystems fsck encrypt btrfs)`  
 Also add `amdgpu` to modules section in `/etc/mkinitcpio.conf`.  
 Example: `MODULES=(amdgpu)`  
-`vim /etc/mkinitcpio.conf`  
+
+Edit whe file with `vim /etc/mkinitcpio.conf`  
 When you are done editing, run `mkinitcpio -p linux`.
 
 Now let's install a bootloader. systemd-boot is kinda simple and easy to setup, so use `bootctl install`.  
@@ -236,7 +237,7 @@ I want to use `bgrt` theme. So `sudo gnome-text-editor /etc/plymouth/plymouthd.c
 You might like different theme, see wiki for details: https://wiki.archlinux.org/title/plymouth  
 Also displaying Arch logo in an option: `sudo cp /usr/share/plymouth/arch-logo.png /usr/share/plymouth/themes/spinner/watermark.png`
 
-And add `quiet splash vt.global_cursor_default=0` `uiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0` as kernel parameters: `sudo gnome-text-editor /boot/loader/entries/archlinux.conf`
+And add `quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0` as kernel parameters: `sudo gnome-text-editor /boot/loader/entries/archlinux.conf`
 
 Rebuild initramfs: `sudo mkinitcpio -p linux`
 
