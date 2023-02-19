@@ -431,6 +431,97 @@ But we have also another option called [gamescope](https://archlinux.org/package
 Install gamescope using `sudo pacman -S gamescope`.  
 Then you can enter game's properties in Steam and enter launch options to something like this: `gamescope  -W 1920 -H 1200 -f -- %command%`. Check the gamescope help for details.
 
+### Enable mDNS resolution
+
+To resolve local hostnames on network we need to enable mDNS:  
+```
+sudo pacman -S nss-mdns
+sudo systemctl enable --now avahi-daemon
+```
+
+Now edit config file with `sudo gnome-text-editor /etc/nsswitch.conf`, find the `hosts` line and add `mdns_minimal [NOTFOUND=return]` (or `mdns4_minimal [NOTFOUND=return]` if you do not have ipv6 connectivity for faster resolution) before `resolve`.  
+Example: `hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns`
+
+### Enable systemd-resolved
+
+If you want advanced DNS resolving capabilities (like having multiple VPNs and query the right one DNS server for a domain in that VPN), you need some advanced resolver on your laptop. I found `sistemd-resolved` pretty handy.  
+For configuration details, see [wiki](https://wiki.archlinux.org/title/Systemd-resolved).  
+You can easily change resolving settings from scripts. Example: `systemd-resolve --interface="vpn0" --set-dns="1.1.1.1" --set-domain=example.local`
+
+```
+sudo systemctl enable --now systemd-resolved
+sudo ln -rsf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+```
+
+### Make vim editor more sane
+
+I use vim editor a lot, mostly on servers in textmode. So I want to dosable mouse interaction and autoformating of pasted text on my desktop - to make vim bave like on most servers.  
+To do that run `sudo gnome-text-editor /etc/vimrc` and add those lines:  
+```
+let skip_defaults_vim=1
+
+" Set the mouse mode to 'r'
+if has('mouse')
+  set mouse=r
+endif
+
+" Disable autoformating when pasting content
+filetype plugin indent off
+```
+
+### Make QT apps look good in Gnome/GTK
+
+To make look QT apps looking mostly same as GTK apps in Gnome it's easier than ever today. Just install needed tools with `sudo pacman -S qgnomeplatform-qt5 qgnomeplatform-qt6`.
+
+See [wiki](https://wiki.archlinux.org/title/Uniform_look_for_Qt_and_GTK_applications) for more details and options. But step above was good enough for me (I rarely use QT apps - for some reason it seems noone makes them anymore.)
+
+### Remove unnecessary icons from application menu
+
+I don't like crowded menu. There are some apps that are installed just as dependecy to another app, or some I use only in terminal (so I do not need desktop icon for that).  
+I've created this script to hide icons from those apps:  
+```
+#!/bin/bash
+UNNECESSARY_APPS=(
+                  'avahi-discover'
+                  'bssh'
+                  'bvnc'
+                  'qvidcap'
+                  'qv4l2'
+                  'libreoffice-base'
+                  'libreoffice-draw'
+                  'libreoffice-math'
+                  'libreoffice-writer'
+                  'libreoffice-calc'
+                  'libreoffice-impress'
+                  'calibre-ebook-edit'
+                  'calibre-ebook-viewer'
+                  'calibre-lrfviewer'
+                  'vim'
+                  'easytag'
+                  'winetricks'
+                  'stoken-gui'
+                  'stoken-gui-small'
+                 )
+
+if [ ! -d "${HOME}/.local/share/applications" ]
+then
+  mkdir -p "${HOME}/.local/share/applications"
+fi
+
+for APP in ${UNNECESSARY_APPS[@]}
+do
+  if [ -f "/usr/share/applications/${APP}.desktop" ]
+  then
+    if [ ! -f "${HOME}/.local/share/applications/${APP}.desktop" ]
+    then
+      cp "/usr/share/applications/${APP}.desktop" "${HOME}/.local/share/applications/${APP}.desktop"
+      sed -i '/NoDisplay=false/d' "${HOME}/.local/share/applications/${APP}.desktop"
+      sed -i -E 's/(\[Desktop Entry\])/\1\nNoDisplay=true/' "${HOME}/.local/share/applications/${APP}.desktop"
+    fi
+  fi
+done
+```
+
 ## That's all
 
 Since kernel 6.1 you do not need to install G14 specific kernel. You are ready to go
