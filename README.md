@@ -366,6 +366,71 @@ table inet filter {
 
 When you done editing, save the config and restart nftables `sudo systemctl restart nftables`.
 
+### Enable Alt+Shift to change keyboard layouts
+```
+gsettings set org.gnome.desktop.wm.keybindings switch-input-source-backward "['<Alt>Shift_L', '<Shift>XF86Keyboard']"
+gsettings set org.gnome.desktop.wm.keybindings switch-input-source "['<Alt>Shift_L', 'XF86Keyboard']"
+```
+
+### Automaticaly add bin directories from user's home directory
+
+Create shell function using `sudo gnome-text-editor /etc/profile.d/homebin.sh` and put this content in:  
+```
+set_path(){
+
+    # Check if user id is 1000 or higher
+    [ "$(id -u)" -ge 1000 ] || return
+
+    for i in "${@}";
+    do
+        # Check if the directory exists
+        [ -d "$i" ] || continue
+
+        # Check if it is not already in your $PATH.
+        echo "$PATH" | grep -Eq "(^|:)$i(:|$)" && continue
+
+        # Then append it to $PATH and export it
+        export PATH="${PATH}:$i"
+    done
+}
+
+set_path ~/bin ~/.local/bin
+```
+
+Then relogin to make change effective.
+
+### Enable hibernation to SWAP file
+
+Edit mkinitcpio config with `sudo gnome-text-editor /etc/mkinitcpio.conf` and add `resume` hook after `filesystem hook`.  
+Example: `HOOKS=(base udev plymouth plymouth-encrypt autodetect modconf kms keyboard keymap consolefont block btrfs filesystems resume fsck)`
+
+Now run `sudo btrfs inspect-internal map-swapfile -r /swap/swapfile` and note the output number as OFFSET.
+
+Now open boot config file with `sudo gnome-text-editor /boot/loader/entries/archlinux.conf` and add `resume=LABEL=ROOT resume_offset=OFFSET`.  
+Full options example: `options	cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0 resume=LABEL=ROOT resume_offset=533760 rw`
+
+Rebuild initrd: `sudo mkinitcpio -p linux`  
+Install an extension which will add hibernate to Gnome menu: `yay -S gnome-shell-extension-hibernate-status-git`  
+And reboot the machine and test it.
+
+### Install extension to tweak Gnome quick-settings
+
+`yay -S gnome-shell-extension-quick-settings-tweaks-git`
+
+### Install liberation TTF font
+
+It's practical to have Liberation font installed, mainly for Steam. `sudo pacman -S ttf-liberation`
+
+### Solving problem when cursor is off in some fulscreen game - Gamescope
+
+Sometimes it happens that game running in fulscreen has a cursor position off. You are pointing with cursor to some button, but in real, another button has focus/is selected.  
+In my case this happened in native linux version of Tropico 6.  
+Usualy, there is an option to run windows version of the game using Proton, which by my experience works OK.  
+But we have also another option called [gamescope](https://archlinux.org/packages/community/x86_64/gamescope/).
+
+Install gamescope using `sudo pacman -S gamescope`.  
+Then you can enter game's properties in Steam and enter launch options to something like this: `gamescope  -W 1920 -H 1200 -f -- %command%`. Check the gamescope help for details.
+
 ## That's all
 
 Since kernel 6.1 you do not need to install G14 specific kernel. You are ready to go
