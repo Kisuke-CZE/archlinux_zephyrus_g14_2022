@@ -455,7 +455,7 @@ sudo ln -rsf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 
 ### Make vim editor more sane
 
-I use vim editor a lot, mostly on servers in textmode. So I want to dosable mouse interaction and autoformating of pasted text on my desktop - to make vim bave like on most servers.  
+I use vim editor a lot, mostly on servers in textmode. So I want to disable mouse interaction and autoformating of pasted text on my desktop - to make vim bave like on most servers.  
 To do that run `sudo gnome-text-editor /etc/vimrc` and add those lines:  
 ```
 let skip_defaults_vim=1
