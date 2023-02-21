@@ -444,7 +444,7 @@ Example: `hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=ret
 
 ### Enable systemd-resolved
 
-If you want advanced DNS resolving capabilities (like having multiple VPNs and query the right one DNS server for a domain in that VPN), you need some advanced resolver on your laptop. I found `sistemd-resolved` pretty handy.  
+If you want advanced DNS resolving capabilities (like having multiple VPNs and query the right one DNS server for a domain in that VPN), you need some advanced resolver on your laptop. I found `systemd-resolved` pretty handy.  
 For configuration details, see [wiki](https://wiki.archlinux.org/title/Systemd-resolved).  
 You can easily change resolving settings from scripts. Example: `systemd-resolve --interface="vpn0" --set-dns="1.1.1.1" --set-domain=example.local`
 
@@ -521,6 +521,15 @@ do
   fi
 done
 ```
+
+### Install and set console font
+To make console text more readable on laptop's display (default one is kinda small for this resolution by my perspective) in installed system, i suggest to use font `terminus`.
+
+Install font using `pacman -S terminus-font`.
+
+I found ideal size for me is `Terminus 10x18 bold` for a 1920x1200 screen of my Zephyrus G14. For detailed info about variants/encodings/sizes you can see this [manual page](https://files.ax86.net/terminus-ttf/README.Terminus.txt).
+
+Then set it as default console font by putting `FONT=ter-v18b` in `/etc/vconsole.conf`. It's a good idea to run `sudo mkinitcpio -p linux` after that to propagate font to initramfs.
 
 ## That's all
 
