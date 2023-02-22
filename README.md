@@ -504,6 +504,7 @@ UNNECESSARY_APPS=(
                   'winetricks'
                   'stoken-gui'
                   'stoken-gui-small'
+                  'cups'
                  )
 
 if [ ! -d "${HOME}/.local/share/applications" ]
