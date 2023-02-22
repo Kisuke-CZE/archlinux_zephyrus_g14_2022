@@ -214,6 +214,9 @@ cd yay
 makepkg -si
 ```
 
+You can also preset the answers for usual questions. But beware - changes are needed when you want to edit PKGBUILD or other files for some reason. See `man yay` for more info.  
+My favorite for everyday simple usage is: `yay --save --answerclean All --answerdiff None`
+
 ### Install Gnome Dash to Dock
 
 I like to have dock so I will use previously installed AUR helper to install Dash to Dock extension: `yay -S gnome-shell-extension-dash-to-dock`
