@@ -535,6 +535,24 @@ I found ideal size for me is `Terminus 10x18 bold` for a 1920x1200 screen of my 
 
 Then set it as default console font by putting `FONT=ter-v18b` in `/etc/vconsole.conf`. It's a good idea to run `sudo mkinitcpio -p linux` after that to propagate font to initramfs.
 
+### Install ZSH
+Actually on the start I was not thinking I will do this, since I wanted to have as close shell on my laptop as on servers I manage. But it seems to be most easy way to achieve some highlighting and more readibility in terminal on local machine. So I tired that and it works so far. But be warned, ZSH can have some capabilities that are not available in BASH, so be careful about this.
+
+Anyway, let's install and activate ZSH:  
+```
+sudo pacman -S zsh zsh-completions zsh-autosuggestions ttf-meslo-nerd zsh-theme-powerlevel10k
+chsh -s /bin/zsh
+zsh
+# Configure initial settings
+echo 'bindkey  "^[[H"   beginning-of-line
+bindkey  "^[[F"   end-of-line
+bindkey  "^[[3~"  delete-char
+
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme' >> .zshrc
+exec zsh
+# After this theme wizard will be shown
+```
+
 ## That's all
 
 Since kernel 6.1 you do not need to install G14 specific kernel. You are ready to go
