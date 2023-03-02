@@ -60,10 +60,10 @@ mkdir -p /mnt/swap
 mkdir -p /mnt/.snapshots
 mkdir -p /mnt/btrfs
 
-mount -o noatime,subvol=@home LABEL=ROOT /mnt/home
-mount -o noatime,subvol=@swap LABEL=ROOT /mnt/swap
-mount -o noatime,subvol=@snapshots LABEL=ROOT /mnt/.snapshots
-mount -o noatime LABEL=ROOT /mnt/btrfs
+mount -o noatime,discard=async,subvol=@home LABEL=ROOT /mnt/home
+mount -o noatime,discard=async,subvol=@swap LABEL=ROOT /mnt/swap
+mount -o noatime,discard=async,subvol=@snapshots LABEL=ROOT /mnt/.snapshots
+mount -o noatime,discard=async LABEL=ROOT /mnt/btrfs
 mount /dev/nvme0n1p1 /mnt/boot
 swapon /mnt/swap/swapfile
 ```
@@ -105,7 +105,7 @@ After that run `locale-gen`
 Set root password with `passwd`.
 
 Add `encrypt btrfs` to hooks in `/etc/mkinitcpio.conf`.  
-Example: `HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block filesystems fsck encrypt btrfs)`  
+Example: `HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)`  
 Also add `amdgpu` to modules section in `/etc/mkinitcpio.conf`.  
 Example: `MODULES=(amdgpu)`  
 
@@ -125,7 +125,7 @@ title          Arch Linux
 linux          /vmlinuz-linux
 initrd	       /amd-ucode.img
 initrd         /initramfs-linux.img
-options        cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root rw
+options        cryptdevice=LABEL=CRYPTROOT:rootfs:allow-discards root=LABEL=ROOT rootflags=subvol=@root rw
 ```
 For some emergency situations let's prepare `archlinux-textmode` option. Menu can be displayed holding space key on boot. `vim /boot/loader/entries/archlinux-textmode.conf`
 ```
@@ -133,12 +133,12 @@ title          Arch Linux (textmode)
 linux          /vmlinuz-linux
 initrd	       /amd-ucode.img
 initrd         /initramfs-linux.img
-options        cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root rw 3
+options        cryptdevice=LABEL=CRYPTROOT:rootfs:allow-discards root=LABEL=ROOT rootflags=subvol=@root rw 3
 ```
 If label won't work for some reason you can use UUID, but **do not use together!**:  
 ```
-echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs root=LABEL=ROOT rootflags=subvol=@root rw" >> /boot/loader/entries/archlinux.conf
-echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs root=LABEL=ROOT rootflags=subvol=@root rw 3" >> /boot/loader/entries/archlinux-textmode.conf
+echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs:allow-discards root=LABEL=ROOT rootflags=subvol=@root rw" >> /boot/loader/entries/archlinux.conf
+echo "options	cryptdevice=UUID=$(blkid -s UUID -o value /dev/nvme0n1p2):rootfs:allow-discards root=LABEL=ROOT rootflags=subvol=@root rw 3" >> /boot/loader/entries/archlinux-textmode.conf
 ```
 
 Consider to set up automatic update of systemd-boot according to this article: https://wiki.archlinux.org/title/Systemd-boot.
@@ -234,7 +234,7 @@ Edit `/etc/mkinitcpio.conf` for example using `sudo gnome-text-editor /etc/mkini
 Delete `encrypt` hook and add `plymouth plymouth-encrypt` after `base udev` hooks.
 
 Next install smooth transition for gdm: `yay -S gdm-plymouth`  
-It will replace `gdm`
+It will replace `gdm`. This step is completely optional and cosmetic - if you preffer to use gdm from main repository, you can just skip this.
 
 I want to use `bgrt` theme. So `sudo gnome-text-editor /etc/plymouth/plymouthd.conf` and set `Theme=bgrt`.  
 You might like different theme, see wiki for details: https://wiki.archlinux.org/title/plymouth  
@@ -410,7 +410,7 @@ Example: `HOOKS=(base udev plymouth plymouth-encrypt autodetect modconf kms keyb
 Now run `sudo btrfs inspect-internal map-swapfile -r /swap/swapfile` and note the output number as OFFSET.
 
 Now open boot config file with `sudo gnome-text-editor /boot/loader/entries/archlinux.conf` and add `resume=LABEL=ROOT resume_offset=OFFSET`.  
-Full options example: `options	cryptdevice=LABEL=CRYPTROOT:rootfs root=LABEL=ROOT rootflags=subvol=@root quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0 resume=LABEL=ROOT resume_offset=533760 rw`
+Full options example: `options	cryptdevice=LABEL=CRYPTROOT:rootfs:allow-discards root=LABEL=ROOT rootflags=subvol=@root quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0 resume=LABEL=ROOT resume_offset=533760 rw`
 
 Rebuild initrd: `sudo mkinitcpio -p linux`  
 Install an extension which will add hibernate to Gnome menu: `yay -S gnome-shell-extension-hibernate-status-git`  
