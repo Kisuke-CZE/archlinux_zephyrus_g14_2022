@@ -505,6 +505,8 @@ UNNECESSARY_APPS=(
                   'stoken-gui'
                   'stoken-gui-small'
                   'cups'
+                  'jconsole-java-openjdk'
+                  'jshell-java-openjdk'
                  )
 
 if [ ! -d "${HOME}/.local/share/applications" ]
