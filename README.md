@@ -215,7 +215,7 @@ makepkg -si
 ```
 
 You can also preset the answers for usual questions. But beware - changes are needed when you want to edit PKGBUILD or other files for some reason. See `man yay` for more info.  
-My favorite for everyday simple usage is: `yay --save --answerclean All --answerdiff None`
+My favorite for everyday simple usage is: `yay --save --answerclean All --answerdiff None --removemake`
 
 ### Install Gnome Dash to Dock
 
