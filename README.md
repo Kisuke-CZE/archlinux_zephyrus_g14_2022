@@ -239,7 +239,6 @@ It will replace `gdm`. This step is completely optional and cosmetic - if you pr
 
 I want to use `bgrt` theme. So `sudo gnome-text-editor /etc/plymouth/plymouthd.conf` and set `Theme=bgrt`.  
 You might like different theme, see wiki for details: https://wiki.archlinux.org/title/plymouth  
-Also displaying Arch logo in an option: `sudo cp /usr/share/plymouth/arch-logo.png /usr/share/plymouth/themes/spinner/watermark.png`
 
 And add `quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 vt.global_cursor_default=0` as kernel parameters: `sudo gnome-text-editor /boot/loader/entries/archlinux.conf`
 
