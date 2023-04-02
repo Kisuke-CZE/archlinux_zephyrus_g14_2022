@@ -104,8 +104,8 @@ After that run `locale-gen`
 
 Set root password with `passwd`.
 
-Add `encrypt btrfs` to hooks in `/etc/mkinitcpio.conf`.  
-Example: `HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block encrypt btrfs filesystems fsck)`  
+Add `encrypt btrfs` to hooks in `/etc/mkinitcpio.conf` after `udev` hook.  
+Example: `HOOKS=(base udev encrypt autodetect modconf kms keyboard keymap consolefont block btrfs filesystems fsck)`  
 Also add `amdgpu` to modules section in `/etc/mkinitcpio.conf`.  
 Example: `MODULES=(amdgpu)`  
 
@@ -227,13 +227,14 @@ There are some applications from default gnome collection I just do not use. Let
 
 ### Make booting process pretty with Plymouth
 
-Well almost all important things are in place. Time for some cosmetics. Install plymouth `yay -S plymouth`
+Well almost all important things are in place. Time for some cosmetics. Install plymouth `pacman -S plymouth`
 
 Edit `/etc/mkinitcpio.conf` for example using `sudo gnome-text-editor /etc/mkinitcpio.conf`.
 
-Delete `encrypt` hook and add `plymouth plymouth-encrypt` after `base udev` hooks.
+Add `plymouth` hook after `base udev` hooks. (but before `encrypt`).  
+Example: `HOOKS=(base udev plymouth encrypt autodetect modconf kms keyboard keymap consolefont block btrfs filesystems fsck)`
 
-Next install smooth transition for gdm: `yay -S gdm-plymouth`  
+If you want, you can install smooth transition for gdm: `yay -S gdm-plymouth`  
 It will replace `gdm`. This step is completely optional and cosmetic - if you preffer to use gdm from main repository, you can just skip this.
 
 I want to use `bgrt` theme. So `sudo gnome-text-editor /etc/plymouth/plymouthd.conf` and set `Theme=bgrt`.  
@@ -405,7 +406,7 @@ Then relogin to make change effective.
 ### Enable hibernation to SWAP file
 
 Edit mkinitcpio config with `sudo gnome-text-editor /etc/mkinitcpio.conf` and add `resume` hook after `filesystem hook`.  
-Example: `HOOKS=(base udev plymouth plymouth-encrypt autodetect modconf kms keyboard keymap consolefont block btrfs filesystems resume fsck)`
+Example: `HOOKS=(base udev plymouth encrypt autodetect modconf kms keyboard keymap consolefont block btrfs filesystems resume fsck)`
 
 Now run `sudo btrfs inspect-internal map-swapfile -r /swap/swapfile` and note the output number as OFFSET.
 
@@ -507,6 +508,15 @@ UNNECESSARY_APPS=(
                   'cups'
                   'jconsole-java-openjdk'
                   'jshell-java-openjdk'
+                  'displaycal-3dlut-maker'
+                  'displaycal-vrml-to-x3d-converter'
+                  'displaycal-curve-viewer'
+                  'lstopo'
+                  'displaycal-apply-profiles'
+                  'displaycal-profile-info'
+                  'displaycal-scripting-client'
+                  'displaycal-synthprofile'
+                  'displaycal-testchart-editor'
                  )
 
 if [ ! -d "${HOME}/.local/share/applications" ]
