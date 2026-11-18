@@ -1,3 +1,6 @@
+>[!WARNING]
+>⚠️ This repository has moved to [codeberg.org/Kisuke-CZE/archlinux_zephyrus_g14_2022](https://codeberg.org/Kisuke-CZE/archlinux_zephyrus_g14_2022)
+
 # Archlinux setup for Asus Zephyrus G14 2022 (GA402RJ/RK)
 
 ## Basic installation
